@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GFC Ubon — KPI Performance Report</title>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page-plane: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+
+    --brand-navy: #14324f;
+    --brand-navy-2: #1e3a5f;
+
+    --series-1: #2a78d6; /* new */
+    --series-2: #eb6834; /* cn */
+    --series-3: #1baf7a; /* opu */
+    --series-4: #eda100; /* icsi */
+    --series-5: #e87ba4; /* oocyte */
+    --series-6: #008300; /* iui */
+    --series-7: #4a3aa7; /* revenue */
+
+    --status-good: #0ca30c;
+    --status-warning: #fab219;
+    --status-serious: #ec835a;
+    --status-critical: #d03b3b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    background: var(--page-plane);
+    margin: 0;
+    color: var(--text-primary);
+  }
+  a { color: inherit; }
+
+  /* ---------- Layout ---------- */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--surface-1);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; padding: 0 8px; }
+  .brand-badge {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #1baf7a, #2a78d6);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 14px;
+  }
+  .brand-name { font-weight: 700; font-size: 15px; line-height: 1.2; }
+  .brand-sub { font-size: 11px; color: var(--text-muted); }
+  .nav-label {
+    font-size: 11px; letter-spacing: 0.04em; color: var(--text-muted);
+    text-transform: uppercase; margin: 20px 8px 8px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); cursor: pointer; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--page-plane); }
+  .nav-item.active { background: var(--brand-navy); color: #fff; }
+  .nav-icon { width: 16px; text-align: center; font-size: 13px; }
+
+  .main { flex: 1; padding: 28px 32px; max-width: 1180px; }
+  .page-header { margin-bottom: 8px; }
+  .eyebrow { font-size: 11px; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; }
+  .page-title { font-size: 26px; font-weight: 700; margin: 0 0 6px; }
+  .page-desc { font-size: 13px; color: var(--text-secondary); max-width: 640px; }
+
+  .filter-row {
+    display: flex; gap: 12px; align-items: center; margin: 18px 0 20px; flex-wrap: wrap;
+  }
+  .filter-row select {
+    padding: 8px 12px; border: 1px solid var(--gridline); border-radius: 8px;
+    font-size: 13px; background: var(--surface-1); color: var(--text-primary);
+  }
+  .filter-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-right: 4px; }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .hero-card {
+    background: var(--brand-navy); color: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px;
+  }
+  .hero-card .label { font-size: 12px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .hero-card .value { font-size: 34px; font-weight: 700; }
+  .hero-row { display: flex; gap: 28px; margin-top: 18px; flex-wrap: wrap; }
+  .hero-row .stat { flex: 1; min-width: 110px; }
+  .hero-row .stat .label { font-size: 11px; opacity: 0.7; }
+  .hero-row .stat .value { font-size: 18px; font-weight: 600; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+
+  .kpi-card .kpi-name { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+  .kpi-card .kpi-value { font-size: 15px; }
+  .kpi-card .kpi-value b { font-size: 22px; color: var(--text-primary); }
+  .kpi-card .kpi-target { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .track { background: var(--gridline); border-radius: 6px; height: 8px; overflow: hidden; margin-top: 8px; }
+  .fill { height: 100%; border-radius: 6px; }
+  .pct-label { margin-top: 6px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+
+  .status-good { color: var(--status-good); }
+  .status-warning { color: #a06a00; } /* darker for text contrast */
+  .status-critical { color: var(--status-critical); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--gridline); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .table-scroll { max-height: 480px; overflow-y: auto; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+  .funnel-stage { margin-bottom: 14px; }
+  .funnel-bar-track { background: var(--page-plane); border-radius: 8px; overflow: hidden; height: 36px; position: relative; }
+  .funnel-bar-fill { height: 100%; border-radius: 8px; display: flex; align-items: center; padding: 0 14px; color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .funnel-conv { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  .insight-list { list-style: none; padding: 0; margin: 0; }
+  .insight-item {
+    display: flex; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--gridline);
+    font-size: 13px; color: var(--text-secondary); align-items: flex-start;
+  }
+  .insight-item:last-child { border-bottom: none; }
+  .insight-icon { font-size: 15px; flex-shrink: 0; }
+  .insight-item b { color: var(--text-primary); }
+
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
+  .msg { margin-top: 16px; padding: 10px 12px; border-radius: 8px; font-size: 13px; display: none; }
+  .msg.success { background: #e3f6e3; color: #0a6b0a; display: block; }
+  .msg.error { background: #fbe3e2; color: #8a1f1e; display: block; }
+
+  /* ---------- Entry form ---------- */
+  .form-card { max-width: 460px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; color: var(--text-secondary); }
+  select.wide, input[type=number], input[type=password] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--gridline);
+    border-radius: 8px; font-size: 15px; background: var(--surface-1); color: var(--text-primary);
+  }
+  button.primary {
+    width: 100%; margin-top: 20px; padding: 12px; background: var(--series-1);
+    color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  button.primary:disabled { background: var(--baseline); cursor: not-allowed; }
+  .current-val { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", "Sarabun", sans-serif; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-badge">GFC</div>
+      <div>
+        <div class="brand-name">GFC Ubon</div>
+        <div class="brand-sub">KPI Performance Report</div>
+      </div>
+    </div>
+
+    <div class="nav-label">คีย์ข้อมูล</div>
+    <div class="nav-item" data-section="entry"><span class="nav-icon">✏️</span> คีย์ข้อมูลรายสัปดาห์</div>
+
+    <div class="nav-label">Performance Report</div>
+    <div class="nav-item" data-section="exec"><span class="nav-icon">▦</span> Executive Summary</div>
+    <div class="nav-item" data-section="trend"><span class="nav-icon">📈</span> Monthly Trend</div>
+    <div class="nav-item" data-section="funnel"><span class="nav-icon">▽</span> Conversion Funnel</div>
+    <div class="nav-item" data-section="forecast"><span class="nav-icon">↗</span> Forecast &amp; Run-Rate</div>
+    <div class="nav-item" data-section="productivity"><span class="nav-icon">฿</span> Revenue Productivity</div>
+    <div class="nav-item" data-section="weekly"><span class="nav-icon">▤</span> Weekly Detail</div>
+    <div class="nav-item" data-section="wow"><span class="nav-icon">↔</span> Week-over-Week</div>
+    <div class="nav-item" data-section="insights"><span class="nav-icon">◎</span> Insights &amp; Action</div>
+  </div>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="main">
+
+    <!-- ===== ENTRY ===== -->
+    <div class="section" id="section-entry">
+      <div class="page-header">
+        <div class="eyebrow">Data Entry</div>
+        <h1 class="page-title">คีย์ข้อมูลรายสัปดาห์</h1>
+        <p class="page-desc">เลือกแผนกและสัปดาห์ แล้วกรอกจำนวน ระบบจะบันทึกเฉพาะข้อมูลของแผนกท่านเท่านั้น</p>
+      </div>
+      <div class="card form-card">
+        <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
+        <form id="entryForm" style="display:none;">
+          <label for="department">แผนก</label>
+          <select class="wide" id="department"></select>
+
+          <div id="pinContainer" style="display:none;">
+            <label for="pin">รหัสผ่านแผนกบัญชี</label>
+            <input type="password" id="pin" placeholder="กรอกรหัสผ่าน">
+          </div>
+
+          <label for="week">สัปดาห์</label>
+          <select class="wide" id="week"></select>
+
+          <div id="fieldsContainer"></div>
+
+          <button type="submit" class="primary" id="submitBtn">บันทึกข้อมูล</button>
+          <div id="msg" class="msg"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== EXECUTIVE SUMMARY ===== -->
+    <div class="section" id="section-exec">
+      <div class="page-header">
+        <div class="eyebrow">Executive Report</div>
+        <h1 class="page-title">Executive Summary</h1>
+        <p class="page-desc">ภาพรวมผลงานเทียบเป้าหมาย แยกตามหมวดบริการ</p>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Period</span>
+        <select id="execMonth"></select>
+      </div>
+      <div id="execLoading" class="loading">กำลังโหลด...</div>
+      <div id="execContent" style="display:none;">
+        <div class="hero-card">
+          <div class="label">Total Revenue</div>
+          <div class="value" id="execRevenueActual">-</div>
+          <div class="hero-row">
+            <div class="stat"><div class="label">เป้าหมาย</div><div class="value" id="execRevenueTarget">-</div></div>
+            <div class="stat"><div class="label">Achieve Target</div><div class="value" id="execRevenuePct">-</div></div>
+            <div class="stat"><div class="label">คงเหลือ</div><div class="value" id="execRevenueRemain">-</div></div>
+          </div>
+        </div>
+        <div class="grid" id="execGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== MONTHLY TREND ===== -->
+    <div class="section" id="section-trend">
+      <div class="page-header">
+        <div class="eyebrow">Trend Analysis</div>
+        <h1 class="page-title">Monthly Trend</h1>
+        <p class="page-desc">เปรียบเทียบผลจริงกับเป้าหมายรายเดือน ตลอดปี 2026</p>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">หมวด</span>
+        <select id="trendCategory"></select>
+      </div>
+      <div id="trendLoading" class="loading">กำลังโหลด...</div>
+      <div id="trendContent" class="card" style="display:none;">
+        <div id="trendChart"></div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--series-1);"></span>ผลจริง</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--text-muted); border-radius:50%;"></span>เป้าหมาย</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CONVERSION FUNNEL ===== -->
+    <div class="section" id="section-funnel">
+      <div class="page-header">
+        <div class="eyebrow">Patient Journey</div>
+        <h1 class="page-title">Conversion Funnel</h1>
+        <p class="page-desc">อัตราการแปลงผู้ป่วยจาก New ไปสู่ CN, OPU และ ICSI</p>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Period</span>
+        <select id="funnelMonth"></select>
+      </div>
+      <div id="funnelLoading" class="loading">กำลังโหลด...</div>
+      <div id="funnelContent" class="card" style="display:none;"></div>
+    </div>
+
+    <!-- ===== FORECAST ===== -->
+    <div class="section" id="section-forecast">
+      <div class="page-header">
+        <div class="eyebrow">Projection</div>
+        <h1 class="page-title">Forecast &amp; Run-Rate</h1>
+        <p class="page-desc">ประเมินผลสิ้นปีจากอัตราการทำงานปัจจุบัน (Run-Rate)</p>
+      </div>
+      <div id="forecastLoading" class="loading">กำลังโหลด...</div>
+      <div id="forecastContent" style="display:none;">
+        <div class="card" id="forecastMeta"></div>
+        <div class="grid" id="forecastGrid"></div>
+      </div>
+    </div>
+
+    <!-- ===== REVENUE PRODUCTIVITY ===== -->
+    <div class="section" id="section-productivity">
+      <div class="page-header">
+        <div class="eyebrow">Financial</div>
+        <h1 class="page-title">Revenue Productivity</h1>
+        <p class="page-desc">รายได้ต่อเคส และสัดส่วนรายได้แยกตามบริการ</p>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Period</span>
+        <select id="prodMonth"></select>
+      </div>
+      <div id="prodLoading" class="loading">กำลังโหลด...</div>
+      <div id="prodContent" style="display:none;">
+        <div class="hero-row" style="margin:0 0 16px;">
+        </div>
+        <div class="grid-4" id="prodStats" style="margin-bottom:16px;"></div>
+        <div class="card" id="prodBreakdown"></div>
+      </div>
+    </div>
+
+    <!-- ===== WEEKLY DETAIL ===== -->
+    <div class="section" id="section-weekly">
+      <div class="page-header">
+        <div class="eyebrow">Raw Data</div>
+        <h1 class="page-title">Weekly Detail</h1>
+        <p class="page-desc">ข้อมูลผลจริงรายสัปดาห์ทั้งหมด (56 สัปดาห์)</p>
+      </div>
+      <div id="weeklyLoading" class="loading">กำลังโหลด...</div>
+      <div id="weeklyContent" class="card table-scroll" style="display:none;"></div>
+    </div>
+
+    <!-- ===== WEEK-OVER-WEEK ===== -->
+    <div class="section" id="section-wow">
+      <div class="page-header">
+        <div class="eyebrow">Comparison</div>
+        <h1 class="page-title">Week-over-Week</h1>
+        <p class="page-desc">เทียบผลจริงของสัปดาห์ที่เลือกกับสัปดาห์ก่อนหน้า</p>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">สัปดาห์</span>
+        <select id="wowWeek"></select>
+      </div>
+      <div id="wowLoading" class="loading">กำลังโหลด...</div>
+      <div id="wowContent" class="grid" style="display:none;"></div>
+    </div>
+
+    <!-- ===== INSIGHTS ===== -->
+    <div class="section" id="section-insights">
+      <div class="page-header">
+        <div class="eyebrow">Summary</div>
+        <h1 class="page-title">Insights &amp; Action</h1>
+        <p class="page-desc">ข้อสังเกตอัตโนมัติจากข้อมูลล่าสุด</p>
+      </div>
+      <div id="insightsLoading" class="loading">กำลังโหลด...</div>
+      <div id="insightsContent" class="card" style="display:none;">
+        <ul class="insight-list" id="insightList"></ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================
+ * ตั้งค่านี้ให้เป็นลิงก์ Web app URL ของ Apps Script (ลงท้ายด้วย /exec)
+ * ========================================================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzY3SEPWcV8UO_pEfFU589d9gYsRQmT3PNih0ccun-G9N6KRhCO2oYrvSVKG8IKS_Qe/exec';
+
+const CATEGORY_COLOR = {
+  newP: 'var(--series-1)', cn: 'var(--series-2)', opu: 'var(--series-3)',
+  icsi: 'var(--series-4)', oocyte: 'var(--series-5)', iui: 'var(--series-6)', revenue: 'var(--series-7)'
+};
+const MONTH_NAMES = [
+  { key: 1, name: 'มกราคม' }, { key: 2, name: 'กุมภาพันธ์' }, { key: 3, name: 'มีนาคม' },
+  { key: 4, name: 'เมษายน' }, { key: 5, name: 'พฤษภาคม' }, { key: 6, name: 'มิถุนายน' },
+  { key: 7, name: 'กรกฎาคม' }, { key: 8, name: 'สิงหาคม' }, { key: 9, name: 'กันยายน' },
+  { key: 10, name: 'ตุลาคม' }, { key: 11, name: 'พฤศจิกายน' }, { key: 12, name: 'ธันวาคม' }
+];
+
+/* -------- API helpers -------- */
+function apiGet(action, params) {
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  if (params) Object.keys(params).forEach(function (k) { url.searchParams.set(k, params[k]); });
+  return fetch(url.toString()).then(function (r) { return r.json(); });
+}
+function apiPost(action, payload) {
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: action, payload: payload })
+  }).then(function (r) { return r.json(); });
+}
+
+/* -------- Formatting helpers -------- */
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '-';
+  return Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+function fmtPct(n) { return (n === null || n === undefined || isNaN(n)) ? '-' : n.toFixed(1) + '%'; }
+function statusOf(pct) {
+  if (pct === null || pct === undefined) return { cls: '', icon: '', label: 'ไม่มีเป้าหมาย' };
+  if (pct >= 100) return { cls: 'status-good', icon: '✓', label: 'ถึงเป้าหมาย' };
+  if (pct >= 70) return { cls: 'status-warning', icon: '●', label: 'ใกล้เป้าหมาย' };
+  return { cls: 'status-critical', icon: '▲', label: 'ต่ำกว่าเป้าหมาย' };
+}
+function statusFill(pct) {
+  if (pct === null || pct === undefined) return 'var(--baseline)';
+  if (pct >= 100) return 'var(--status-good)';
+  if (pct >= 70) return 'var(--status-warning)';
+  return 'var(--status-critical)';
+}
+
+/* =========================================================
+ * NAVIGATION
+ * ========================================================= */
+const navItems = document.querySelectorAll('.nav-item');
+const sections = document.querySelectorAll('.section');
+const loaded = {};
+
+navItems.forEach(function (item) {
+  item.addEventListener('click', function () {
+    navItems.forEach(function (n) { n.classList.remove('active'); });
+    item.classList.add('active');
+    const key = item.dataset.section;
+    sections.forEach(function (s) { s.classList.remove('active'); });
+    document.getElementById('section-' + key).classList.add('active');
+    if (!loaded[key]) {
+      loaded[key] = true;
+      initSection(key);
+    }
+  });
+});
+
+function initSection(key) {
+  if (key === 'entry') loadEntry();
+  else if (key === 'exec') initExec();
+  else if (key === 'trend') initTrend();
+  else if (key === 'funnel') initFunnel();
+  else if (key === 'forecast') initForecast();
+  else if (key === 'productivity') initProductivity();
+  else if (key === 'weekly') initWeekly();
+  else if (key === 'wow') initWow();
+  else if (key === 'insights') initInsights();
+}
+
+/* =========================================================
+ * ENTRY FORM
+ * ========================================================= */
+let ENTRY_CONFIG = null;
+function loadEntry() {
+  apiGet('config').then(onEntryConfig).catch(onEntryError);
+}
+function onEntryConfig(config) {
+  ENTRY_CONFIG = config;
+  const deptSelect = document.getElementById('department');
+  config.departments.forEach(function (d) {
+    const opt = document.createElement('option'); opt.value = d; opt.textContent = d;
+    deptSelect.appendChild(opt);
+  });
+  const weekSelect = document.getElementById('week');
+  config.weeks.forEach(function (w) {
+    const opt = document.createElement('option'); opt.value = w.row;
+    opt.textContent = 'สัปดาห์ที่ ' + w.weekIndex + ' (' + w.label + ')';
+    weekSelect.appendChild(opt);
+  });
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('entryForm').style.display = 'block';
+  renderEntryFields();
+  loadEntryCurrentValues();
+  deptSelect.addEventListener('change', renderEntryFields);
+  weekSelect.addEventListener('change', function () { renderEntryFields(); loadEntryCurrentValues(); });
+}
+function renderEntryFields() {
+  const dept = document.getElementById('department').value;
+  const fields = ENTRY_CONFIG.departmentFields[dept] || [];
+  const container = document.getElementById('fieldsContainer');
+  container.innerHTML = '';
+  document.getElementById('pinContainer').style.display = (dept === ENTRY_CONFIG.adminDepartment) ? 'block' : 'none';
+  fields.forEach(function (key) {
+    const label = document.createElement('label');
+    label.textContent = ENTRY_CONFIG.fieldLabels[key];
+    label.setAttribute('for', 'f_' + key);
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.id = 'f_' + key; input.dataset.key = key;
+    const hint = document.createElement('div'); hint.className = 'current-val'; hint.id = 'hint_' + key;
+    container.appendChild(label); container.appendChild(input); container.appendChild(hint);
+  });
+}
+function loadEntryCurrentValues() {
+  const row = document.getElementById('week').value;
+  if (!row) return;
+  apiGet('rowdata', { row: row }).then(function (data) {
+    Object.keys(data).forEach(function (key) {
+      const hint = document.getElementById('hint_' + key);
+      if (hint) hint.textContent = (data[key] === null || data[key] === '') ? 'ยังไม่มีข้อมูล' : ('ค่าปัจจุบัน: ' + data[key]);
+    });
+  }).catch(onEntryError);
+}
+document.getElementById('entryForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  const dept = document.getElementById('department').value;
+  const row = Number(document.getElementById('week').value);
+  const fields = ENTRY_CONFIG.departmentFields[dept] || [];
+  const values = {};
+  fields.forEach(function (key) {
+    const el = document.getElementById('f_' + key);
+    if (el && el.value !== '') values[key] = el.value;
+  });
+  const pin = document.getElementById('pin').value;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  apiPost('submitEntry', { row: row, department: dept, values: values, pin: pin })
+    .then(function (res) {
+      const msg = document.getElementById('msg');
+      if (res.success) { msg.className = 'msg success'; msg.textContent = 'บันทึกข้อมูลเรียบร้อยแล้ว'; loadEntryCurrentValues(); }
+      else { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + res.message; }
+      btn.disabled = false; btn.textContent = 'บันทึกข้อมูล';
+    })
+    .catch(function (err) { onEntryError(err); btn.disabled = false; btn.textContent = 'บันทึกข้อมูล'; });
+});
+function onEntryError(err) {
+  const msg = document.getElementById('msg');
+  if (msg) { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err); }
+  const loadingEl = document.getElementById('loading');
+  if (loadingEl) loadingEl.textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (err.message || err);
+}
+
+/* =========================================================
+ * EXECUTIVE SUMMARY
+ * ========================================================= */
+function initExec() {
+  const sel = document.getElementById('execMonth');
+  const allOpt = document.createElement('option'); allOpt.value = 'all'; allOpt.textContent = 'ทั้งปี 2026';
+  sel.appendChild(allOpt);
+  MONTH_NAMES.forEach(function (m) {
+    const opt = document.createElement('option'); opt.value = m.key; opt.textContent = m.name + ' 2026';
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', function () { loadExec(sel.value); });
+  loadExec('all');
+}
+function loadExec(month) {
+  document.getElementById('execLoading').style.display = 'block';
+  document.getElementById('execContent').style.display = 'none';
+  apiGet('report', { month: month }).then(renderExec).catch(function (err) {
+    document.getElementById('execLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderExec(data) {
+  document.getElementById('execLoading').style.display = 'none';
+  document.getElementById('execContent').style.display = 'block';
+  const rev = data.categories.revenue;
+  document.getElementById('execRevenueActual').textContent = fmt(rev.actual) + ' บาท';
+  document.getElementById('execRevenueTarget').textContent = fmt(rev.target) + ' บาท';
+  document.getElementById('execRevenuePct').textContent = fmtPct(rev.achievePercent);
+  document.getElementById('execRevenueRemain').textContent = fmt(Math.max(0, rev.target - rev.actual)) + ' บาท';
+
+  const grid = document.getElementById('execGrid');
+  grid.innerHTML = '';
+  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui'];
+  order.forEach(function (key) {
+    const c = data.categories[key];
+    if (!c) return;
+    const st = statusOf(c.achievePercent);
+    const card = document.createElement('div');
+    card.className = 'card kpi-card';
+    card.innerHTML =
+      '<div class="kpi-name">' + c.label + '</div>' +
+      '<div class="kpi-value"><b>' + fmt(c.actual) + '</b></div>' +
+      '<div class="kpi-target">เป้าหมาย ' + fmt(c.target) + '</div>' +
+      '<div class="track"><div class="fill" style="width:' + Math.min(100, c.achievePercent || 0) + '%;background:' + statusFill(c.achievePercent) + ';"></div></div>' +
+      '<div class="pct-label ' + st.cls + '">' + st.icon + ' ' + fmtPct(c.achievePercent) + ' — ' + st.label + '</div>';
+    grid.appendChild(card);
+  });
+}
+
+/* =========================================================
+ * MONTHLY TREND
+ * ========================================================= */
+function initTrend() {
+  const sel = document.getElementById('trendCategory');
+  const cats = [
+    { key: 'revenue', label: 'Revenue' }, { key: 'newP', label: 'New' }, { key: 'cn', label: 'CN' },
+    { key: 'opu', label: 'OPU' }, { key: 'icsi', label: 'ICSI' }, { key: 'oocyte', label: 'Oocyte Freezing' }, { key: 'iui', label: 'IUI' }
+  ];
+  cats.forEach(function (c) {
+    const opt = document.createElement('option'); opt.value = c.key; opt.textContent = c.label;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', function () { loadTrend(sel.value); });
+  loadTrend('revenue');
+}
+function loadTrend(category) {
+  document.getElementById('trendLoading').style.display = 'block';
+  document.getElementById('trendContent').style.display = 'none';
+  apiGet('monthlyTrend', { category: category }).then(renderTrend).catch(function (err) {
+    document.getElementById('trendLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderTrend(data) {
+  document.getElementById('trendLoading').style.display = 'none';
+  document.getElementById('trendContent').style.display = 'block';
+  const months = data.months;
+  const w = 1080, h = 320, padL = 50, padR = 20, padT = 20, padB = 34;
+  const chartW = w - padL - padR, chartH = h - padT - padB;
+  const barGap = chartW / months.length;
+  const barW = Math.min(34, barGap * 0.42);
+  const maxVal = Math.max.apply(null, months.map(function (m) { return Math.max(m.actual, m.target); })) || 1;
+  const color = CATEGORY_COLOR[data.category] || 'var(--series-1)';
+
+  let bars = '', targets = '', axisLabels = '', gridLines = '';
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + chartH - (i / 4) * chartH;
+    gridLines += '<line x1="' + padL + '" y1="' + y + '" x2="' + (w - padR) + '" y2="' + y + '" stroke="var(--gridline)" stroke-width="1"/>';
+    gridLines += '<text x="' + (padL - 8) + '" y="' + (y + 4) + '" font-size="10" fill="var(--text-muted)" text-anchor="end">' + fmt(maxVal * i / 4) + '</text>';
+  }
+  months.forEach(function (m, i) {
+    const cx = padL + barGap * i + barGap / 2;
+    const barH = (m.actual / maxVal) * chartH;
+    const y = padT + chartH - barH;
+    bars += '<rect x="' + (cx - barW / 2) + '" y="' + y + '" width="' + barW + '" height="' + Math.max(2, barH) + '" rx="3" fill="' + color + '"><title>' + m.name + ': ผลจริง ' + fmt(m.actual) + '</title></rect>';
+    const ty = padT + chartH - (m.target / maxVal) * chartH;
+    targets += '<line x1="' + (cx - barW / 2 - 4) + '" y1="' + ty + '" x2="' + (cx + barW / 2 + 4) + '" y2="' + ty + '" stroke="var(--text-muted)" stroke-width="2" stroke-dasharray="3,2"><title>' + m.name + ': เป้าหมาย ' + fmt(m.target) + '</title></line>';
+    axisLabels += '<text x="' + cx + '" y="' + (h - padB + 16) + '" font-size="10" fill="var(--text-muted)" text-anchor="middle">' + m.name.slice(0, 3) + '</text>';
+  });
+
+  document.getElementById('trendChart').innerHTML =
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;">' + gridLines + bars + targets + axisLabels + '</svg>';
+}
+
+/* =========================================================
+ * CONVERSION FUNNEL
+ * ========================================================= */
+function initFunnel() {
+  const sel = document.getElementById('funnelMonth');
+  const allOpt = document.createElement('option'); allOpt.value = 'all'; allOpt.textContent = 'ทั้งปี 2026';
+  sel.appendChild(allOpt);
+  MONTH_NAMES.forEach(function (m) {
+    const opt = document.createElement('option'); opt.value = m.key; opt.textContent = m.name + ' 2026';
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', function () { loadFunnel(sel.value); });
+  loadFunnel('all');
+}
+function loadFunnel(month) {
+  document.getElementById('funnelLoading').style.display = 'block';
+  document.getElementById('funnelContent').style.display = 'none';
+  apiGet('funnel', { month: month }).then(renderFunnel).catch(function (err) {
+    document.getElementById('funnelLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderFunnel(data) {
+  document.getElementById('funnelLoading').style.display = 'none';
+  const el = document.getElementById('funnelContent');
+  el.style.display = 'block';
+  const maxVal = data.stages[0].actual || 1;
+  let html = '';
+  data.stages.forEach(function (s) {
+    const widthPct = Math.max(6, (s.actual / maxVal) * 100);
+    html += '<div class="funnel-stage">' +
+      '<div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:' + widthPct + '%;background:' + CATEGORY_COLOR[s.key] + ';">' + s.label + ' — ' + fmt(s.actual) + '</div></div>' +
+      (s.conversionFromPrev !== null ? '<div class="funnel-conv">conversion จากขั้นก่อนหน้า: ' + fmtPct(s.conversionFromPrev) + '</div>' : '') +
+      '</div>';
+  });
+  el.innerHTML = html;
+}
+
+/* =========================================================
+ * FORECAST & RUN-RATE
+ * ========================================================= */
+function initForecast() { loadForecast(); }
+function loadForecast() {
+  document.getElementById('forecastLoading').style.display = 'block';
+  document.getElementById('forecastContent').style.display = 'none';
+  apiGet('forecast').then(renderForecast).catch(function (err) {
+    document.getElementById('forecastLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderForecast(data) {
+  document.getElementById('forecastLoading').style.display = 'none';
+  document.getElementById('forecastContent').style.display = 'block';
+  document.getElementById('forecastMeta').innerHTML =
+    '<div class="kpi-name">ความคืบหน้าของข้อมูล</div>' +
+    '<div class="kpi-value"><b>' + data.weeksWithData + '</b> / ' + data.totalWeeks + ' สัปดาห์ มีการคีย์ข้อมูลแล้ว</div>' +
+    '<div class="track"><div class="fill" style="width:' + (data.weeksWithData / data.totalWeeks * 100) + '%;background:var(--series-1);"></div></div>';
+
+  const grid = document.getElementById('forecastGrid');
+  grid.innerHTML = '';
+  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui', 'revenue'];
+  order.forEach(function (key) {
+    const c = data.categories[key];
+    if (!c) return;
+    const st = statusOf(c.projectedPercentOfTarget);
+    const card = document.createElement('div');
+    card.className = 'card kpi-card';
+    card.innerHTML =
+      '<div class="kpi-name">' + c.label + '</div>' +
+      '<div class="kpi-value"><b>' + fmt(c.actualToDate) + '</b> <span style="font-size:12px;color:var(--text-muted);">ผลจริงถึงปัจจุบัน</span></div>' +
+      '<div class="kpi-target">คาดการณ์สิ้นปี: ' + fmt(c.projectedYearEnd) + ' / เป้าหมาย ' + fmt(c.annualTarget) + '</div>' +
+      '<div class="track"><div class="fill" style="width:' + Math.min(100, c.projectedPercentOfTarget || 0) + '%;background:' + statusFill(c.projectedPercentOfTarget) + ';"></div></div>' +
+      '<div class="pct-label ' + st.cls + '">' + st.icon + ' คาดว่าจะได้ ' + fmtPct(c.projectedPercentOfTarget) + ' ของเป้าหมาย</div>';
+    grid.appendChild(card);
+  });
+}
+
+/* =========================================================
+ * REVENUE PRODUCTIVITY
+ * ========================================================= */
+function initProductivity() {
+  const sel = document.getElementById('prodMonth');
+  const allOpt = document.createElement('option'); allOpt.value = 'all'; allOpt.textContent = 'ทั้งปี 2026';
+  sel.appendChild(allOpt);
+  MONTH_NAMES.forEach(function (m) {
+    const opt = document.createElement('option'); opt.value = m.key; opt.textContent = m.name + ' 2026';
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', function () { loadProductivity(sel.value); });
+  loadProductivity('all');
+}
+function loadProductivity(month) {
+  document.getElementById('prodLoading').style.display = 'block';
+  document.getElementById('prodContent').style.display = 'none';
+  apiGet('revenueProductivity', { month: month }).then(renderProductivity).catch(function (err) {
+    document.getElementById('prodLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderProductivity(data) {
+  document.getElementById('prodLoading').style.display = 'none';
+  document.getElementById('prodContent').style.display = 'block';
+
+  const stats = document.getElementById('prodStats');
+  stats.innerHTML =
+    '<div class="card"><div class="kpi-name">รายได้รวม</div><div class="kpi-value"><b>' + fmt(data.totalRevenue) + '</b> บาท</div></div>' +
+    '<div class="card"><div class="kpi-name">จำนวนเคสรวม</div><div class="kpi-value"><b>' + fmt(data.totalCases) + '</b> เคส</div></div>' +
+    '<div class="card"><div class="kpi-name">รายได้ต่อเคส</div><div class="kpi-value"><b>' + fmt(data.revenuePerCase) + '</b> บาท</div></div>' +
+    '<div class="card"><div class="kpi-name">ช่วงเวลา</div><div class="kpi-value"><b>' + data.monthLabel + '</b></div></div>';
+
+  const order = ['opuDelight', 'opuIcsi', 'icsiDelight', 'icsiIcsi', 'oocyte1', 'oocyte2', 'iui'];
+  const colorList = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)'];
+  let rows = '<table><thead><tr><th>บริการ</th><th>จำนวน</th><th>ราคา/หน่วย</th><th>รายได้</th><th>สัดส่วน</th></tr></thead><tbody>';
+  order.forEach(function (key, i) {
+    const b = data.breakdown[key];
+    if (!b) return;
+    rows += '<tr>' +
+      '<td><span class="legend-dot" style="background:' + colorList[i] + ';display:inline-block;margin-right:6px;"></span>' + b.label + '</td>' +
+      '<td>' + fmt(b.count) + '</td>' +
+      '<td>' + fmt(b.unitPrice) + '</td>' +
+      '<td>' + fmt(b.revenue) + '</td>' +
+      '<td>' + fmtPct(b.percentOfRevenue) + '</td>' +
+      '</tr>';
+  });
+  rows += '</tbody></table>';
+  document.getElementById('prodBreakdown').innerHTML = rows;
+}
+
+/* =========================================================
+ * WEEKLY DETAIL
+ * ========================================================= */
+let WEEKLY_DATA = null;
+function initWeekly() {
+  document.getElementById('weeklyLoading').style.display = 'block';
+  document.getElementById('weeklyContent').style.display = 'none';
+  apiGet('weeklyDetail').then(function (data) {
+    WEEKLY_DATA = data;
+    renderWeekly(data);
+  }).catch(function (err) {
+    document.getElementById('weeklyLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderWeekly(data) {
+  document.getElementById('weeklyLoading').style.display = 'none';
+  document.getElementById('weeklyContent').style.display = 'block';
+  let html = '<table><thead><tr><th>สัปดาห์</th><th>New</th><th>CN</th><th>OPU</th><th>ICSI</th><th>Oocyte</th><th>IUI</th><th>Revenue</th></tr></thead><tbody>';
+  data.forEach(function (w) {
+    html += '<tr>' +
+      '<td>' + w.weekIndex + '. ' + w.label + '</td>' +
+      '<td>' + fmt(w.values.newP) + '</td>' +
+      '<td>' + fmt(w.values.cn) + '</td>' +
+      '<td>' + fmt(w.values.opu) + '</td>' +
+      '<td>' + fmt(w.values.icsi) + '</td>' +
+      '<td>' + fmt(w.values.oocyte) + '</td>' +
+      '<td>' + fmt(w.values.iui) + '</td>' +
+      '<td>' + fmt(w.values.revenue) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('weeklyContent').innerHTML = html;
+}
+
+/* =========================================================
+ * WEEK-OVER-WEEK
+ * ========================================================= */
+function initWow() {
+  document.getElementById('wowLoading').style.display = 'block';
+  document.getElementById('wowContent').style.display = 'none';
+  const fetchPromise = WEEKLY_DATA ? Promise.resolve(WEEKLY_DATA) : apiGet('weeklyDetail');
+  fetchPromise.then(function (data) {
+    WEEKLY_DATA = data;
+    const sel = document.getElementById('wowWeek');
+    sel.innerHTML = '';
+    data.forEach(function (w, i) {
+      if (i === 0) return; // ไม่มีสัปดาห์ก่อนหน้าสำหรับสัปดาห์แรก
+      const opt = document.createElement('option'); opt.value = i;
+      opt.textContent = 'สัปดาห์ที่ ' + w.weekIndex + ' (' + w.label + ')';
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', function () { renderWow(Number(sel.value)); });
+    renderWow(data.length - 1);
+  }).catch(function (err) {
+    document.getElementById('wowLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderWow(index) {
+  document.getElementById('wowLoading').style.display = 'none';
+  document.getElementById('wowContent').style.display = 'grid';
+  document.getElementById('wowWeek').value = index;
+  const current = WEEKLY_DATA[index];
+  const prev = WEEKLY_DATA[index - 1];
+  const grid = document.getElementById('wowContent');
+  grid.innerHTML = '';
+  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui', 'revenue'];
+  const labelMap = { newP: 'New', cn: 'CN', opu: 'OPU', icsi: 'ICSI', oocyte: 'Oocyte Freezing', iui: 'IUI', revenue: 'Revenue' };
+  order.forEach(function (key) {
+    const curVal = current.values[key];
+    const prevVal = prev.values[key];
+    const diff = curVal - prevVal;
+    const pctChange = prevVal !== 0 ? (diff / prevVal * 100) : null;
+    const up = diff > 0, flat = diff === 0;
+    const arrow = flat ? '→' : (up ? '▲' : '▼');
+    const cls = flat ? '' : (up ? 'status-good' : 'status-critical');
+    const card = document.createElement('div');
+    card.className = 'card kpi-card';
+    card.innerHTML =
+      '<div class="kpi-name">' + labelMap[key] + '</div>' +
+      '<div class="kpi-value"><b>' + fmt(curVal) + '</b></div>' +
+      '<div class="kpi-target">สัปดาห์ก่อนหน้า: ' + fmt(prevVal) + '</div>' +
+      '<div class="pct-label ' + cls + '">' + arrow + ' ' + (diff > 0 ? '+' : '') + fmt(diff) + (pctChange !== null ? ' (' + (diff > 0 ? '+' : '') + pctChange.toFixed(1) + '%)' : '') + '</div>';
+    grid.appendChild(card);
+  });
+}
+
+/* =========================================================
+ * INSIGHTS & ACTION
+ * ========================================================= */
+function initInsights() {
+  document.getElementById('insightsLoading').style.display = 'block';
+  document.getElementById('insightsContent').style.display = 'none';
+  Promise.all([apiGet('report', { month: 'all' }), apiGet('forecast')]).then(function (results) {
+    renderInsights(results[0], results[1]);
+  }).catch(function (err) {
+    document.getElementById('insightsLoading').textContent = 'โหลดไม่สำเร็จ: ' + (err.message || err);
+  });
+}
+function renderInsights(report, forecast) {
+  document.getElementById('insightsLoading').style.display = 'none';
+  document.getElementById('insightsContent').style.display = 'block';
+
+  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui'];
+  const withPct = order.map(function (k) { return { key: k, label: report.categories[k].label, pct: report.categories[k].achievePercent }; })
+    .filter(function (c) { return c.pct !== null; });
+  withPct.sort(function (a, b) { return b.pct - a.pct; });
+
+  const items = [];
+
+  if (withPct.length) {
+    const best = withPct[0], worst = withPct[withPct.length - 1];
+    items.push({ icon: '✓', html: 'หมวดที่ทำได้ดีที่สุดคือ <b>' + best.label + '</b> ที่ ' + fmtPct(best.pct) + ' ของเป้าหมาย' });
+    items.push({ icon: '▲', html: 'หมวดที่ควรให้ความสนใจมากที่สุดคือ <b>' + worst.label + '</b> ซึ่งอยู่ที่ ' + fmtPct(worst.pct) + ' ของเป้าหมายเท่านั้น' });
+  }
+
+  const rev = report.categories.revenue;
+  items.push({ icon: '฿', html: 'Revenue รวมทั้งปีอยู่ที่ <b>' + fmt(rev.actual) + '</b> บาท คิดเป็น ' + fmtPct(rev.achievePercent) + ' ของเป้าหมาย ' + fmt(rev.target) + ' บาท' });
+
+  const revForecast = forecast.categories.revenue;
+  if (revForecast && revForecast.projectedPercentOfTarget !== null) {
+    items.push({ icon: '↗', html: 'ตามอัตราปัจจุบัน (Run-Rate) คาดว่า Revenue จะปิดปีที่ <b>' + fmt(revForecast.projectedYearEnd) + '</b> บาท หรือ ' + fmtPct(revForecast.projectedPercentOfTarget) + ' ของเป้าหมาย' });
+  }
+
+  items.push({ icon: '◎', html: 'มีการคีย์ข้อมูลแล้ว <b>' + forecast.weeksWithData + '</b> จากทั้งหมด ' + forecast.totalWeeks + ' สัปดาห์ (' + fmtPct(forecast.weeksWithData / forecast.totalWeeks * 100) + ' ของปี)' });
+
+  const list = document.getElementById('insightList');
+  list.innerHTML = '';
+  items.forEach(function (it) {
+    const li = document.createElement('li');
+    li.className = 'insight-item';
+    li.innerHTML = '<span class="insight-icon">' + it.icon + '</span><span>' + it.html + '</span>';
+    list.appendChild(li);
+  });
+}
+
+/* -------- Boot: default to Executive Summary -------- */
+document.querySelector('.nav-item[data-section="exec"]').click();
+</script>
+</body>
+</html>
