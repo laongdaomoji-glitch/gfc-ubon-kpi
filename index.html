@@ -380,19 +380,57 @@ const MONTH_NAMES = [
   { key: 10, name: 'ตุลาคม' }, { key: 11, name: 'พฤศจิกายน' }, { key: 12, name: 'ธันวาคม' }
 ];
 
-/* -------- API helpers -------- */
+/* -------- API helpers --------
+ * ใช้เทคนิค JSONP (โหลดผ่านแท็ก <script>) แทน fetch() ตรงๆ
+ * เพราะ Google Apps Script ไม่อนุญาตให้เว็บอื่น (เช่น GitHub Pages) เรียกข้อมูลข้ามโดเมนผ่าน fetch/XHR ได้ (CORS)
+ * แต่การโหลดผ่าน <script src="..."> ไม่ติดข้อจำกัดนี้
+ */
+let jsonpCounter = 0;
+function jsonpRequest(url) {
+  return new Promise(function (resolve, reject) {
+    jsonpCounter += 1;
+    const cbName = 'gfcJsonpCb_' + jsonpCounter;
+    const script = document.createElement('script');
+    let done = false;
+    const cleanup = function () {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    };
+    window[cbName] = function (data) {
+      done = true;
+      cleanup();
+      resolve(data);
+    };
+    script.onerror = function () {
+      if (done) return;
+      cleanup();
+      reject(new Error('เชื่อมต่อ API ไม่สำเร็จ'));
+    };
+    const timer = setTimeout(function () {
+      if (done) return;
+      cleanup();
+      reject(new Error('หมดเวลาเชื่อมต่อ API'));
+    }, 20000);
+    const sep = url.indexOf('?') >= 0 ? '&' : '?';
+    script.src = url + sep + 'callback=' + cbName;
+    document.body.appendChild(script);
+  });
+}
 function apiGet(action, params) {
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   if (params) Object.keys(params).forEach(function (k) { url.searchParams.set(k, params[k]); });
-  return fetch(url.toString()).then(function (r) { return r.json(); });
+  return jsonpRequest(url.toString());
 }
 function apiPost(action, payload) {
-  return fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: action, payload: payload })
-  }).then(function (r) { return r.json(); });
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  Object.keys(payload || {}).forEach(function (k) {
+    const v = payload[k];
+    url.searchParams.set(k, (k === 'values' ? JSON.stringify(v) : v));
+  });
+  return jsonpRequest(url.toString());
 }
 
 /* -------- Formatting helpers -------- */
