@@ -148,7 +148,15 @@
   .msg.error { background: #fbe3e2; color: #8a1f1e; display: block; }
 
   /* ---------- Entry form ---------- */
-  .form-card { max-width: 460px; }
+  .form-card { max-width: 900px; }
+  .entry-columns { display: flex; gap: 32px; flex-wrap: wrap; margin-top: 8px; }
+  .entry-col { flex: 1; min-width: 260px; }
+  .entry-col-title {
+    font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--text-muted); font-weight: 700; margin: 4px 0 4px; padding-top: 12px;
+    border-top: 1px solid var(--gridline);
+  }
+  .entry-col:first-child .entry-col-title { border-top: none; padding-top: 0; }
   label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; color: var(--text-secondary); }
   select.wide, input[type=number], input[type=password] {
     width: 100%; padding: 10px 12px; border: 1px solid var(--gridline);
@@ -218,7 +226,18 @@
           <label for="week">สัปดาห์</label>
           <select class="wide" id="week"></select>
 
-          <div id="fieldsContainer"></div>
+          <div class="entry-columns">
+            <div class="entry-col">
+              <div class="entry-col-title">ข้อมูลของแผนกที่เลือก</div>
+              <div id="fieldsContainer"></div>
+            </div>
+            <div class="entry-col">
+              <div class="entry-col-title">บริการหลัก (ทุกแผนกกรอกได้)</div>
+              <div id="mainFieldsContainer"></div>
+              <div class="entry-col-title" style="margin-top:20px;">บริการเสริม (ทุกแผนกกรอกได้)</div>
+              <div id="supportFieldsContainer"></div>
+            </div>
+          </div>
 
           <button type="submit" class="primary" id="submitBtn">บันทึกข้อมูล</button>
           <div id="msg" class="msg"></div>
@@ -249,6 +268,10 @@
           </div>
         </div>
         <div class="grid" id="execGrid"></div>
+        <div class="entry-col-title" style="margin-top:24px;">บริการหลัก</div>
+        <div class="grid" id="execMainGrid"></div>
+        <div class="entry-col-title" style="margin-top:24px;">บริการเสริม</div>
+        <div class="grid" id="execExtraGrid"></div>
       </div>
     </div>
 
@@ -374,6 +397,34 @@ const CATEGORY_COLOR = {
   newP: 'var(--series-1)', cn: 'var(--series-2)', opu: 'var(--series-3)',
   icsi: 'var(--series-4)', oocyte: 'var(--series-5)', iui: 'var(--series-6)', revenue: 'var(--series-7)'
 };
+/* รายการเสริม (Gold/Platinum/FET ฯลฯ) — key และ group ต้องตรงกับ EXTRA_FIELDS ใน Code.gs
+ * group: 'main' = บริการหลัก, 'support' = บริการเสริม
+ */
+const EXTRA_FIELDS = [
+  { key: 'goldBall1', label: 'Gold ก้อน1', group: 'main' },
+  { key: 'goldBall2', label: 'Gold ก้อน2', group: 'main' },
+  { key: 'fet', label: 'FET', group: 'main' },
+  { key: 'platinumBall1', label: 'Platinum ก้อน 1', group: 'main' },
+  { key: 'platinumBall2', label: 'Platinum ก้อน 2', group: 'main' },
+  { key: 'extraIui', label: 'IUI', group: 'main' },
+  { key: 'oocFzBall1', label: 'Ooc.Fz ก้อนที่ 1', group: 'main' },
+  { key: 'oocFzBall2', label: 'Ooc.Fz ก้อนที่ 2', group: 'main' },
+  { key: 'consultInfertility', label: 'Consult Infertility', group: 'support' },
+  { key: 'aep', label: 'AEP', group: 'support' },
+  { key: 'anc', label: 'ANC', group: 'support' },
+  { key: 'gyn', label: 'GYN', group: 'support' },
+  { key: 'ngs', label: 'NGS', group: 'support' },
+  { key: 'embryoFreeze', label: 'Embryo Freez', group: 'support' },
+  { key: 'dating', label: 'Dating', group: 'support' },
+  { key: 'anc12wkIcsi', label: '12wk ANC(ICSI)', group: 'support' },
+  { key: 'hysteroscopy', label: 'Hysteroscopy', group: 'support' },
+  { key: 'goodsIssue', label: 'Goods Issue', group: 'support' }
+];
+const EXTRA_COLOR_CYCLE = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)'];
+function extraColor(key) {
+  const i = EXTRA_FIELDS.findIndex(function (f) { return f.key === key; });
+  return EXTRA_COLOR_CYCLE[i >= 0 ? i % EXTRA_COLOR_CYCLE.length : 0];
+}
 const MONTH_NAMES = [
   { key: 1, name: 'มกราคม' }, { key: 2, name: 'กุมภาพันธ์' }, { key: 3, name: 'มีนาคม' },
   { key: 4, name: 'เมษายน' }, { key: 5, name: 'พฤษภาคม' }, { key: 6, name: 'มิถุนายน' },
@@ -509,16 +560,23 @@ function onEntryConfig(config) {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('entryForm').style.display = 'block';
   renderEntryFields();
+  renderExtraFields();
   loadEntryCurrentValues();
   deptSelect.addEventListener('change', renderEntryFields);
   weekSelect.addEventListener('change', function () { renderEntryFields(); loadEntryCurrentValues(); });
 }
 function renderEntryFields() {
   const dept = document.getElementById('department').value;
-  const fields = ENTRY_CONFIG.departmentFields[dept] || [];
+  const extraSet = {};
+  (ENTRY_CONFIG.extraFieldKeys || []).forEach(function (k) { extraSet[k] = true; });
+  const fields = (ENTRY_CONFIG.departmentFields[dept] || []).filter(function (key) { return !extraSet[key]; });
   const container = document.getElementById('fieldsContainer');
   container.innerHTML = '';
   document.getElementById('pinContainer').style.display = (dept === ENTRY_CONFIG.adminDepartment) ? 'block' : 'none';
+  if (!fields.length) {
+    container.innerHTML = '<div class="current-val">แผนกนี้ไม่มีช่องข้อมูลเฉพาะ กรอกที่ "บริการหลัก/บริการเสริม" ทางขวาได้เลย</div>';
+    return;
+  }
   fields.forEach(function (key) {
     const label = document.createElement('label');
     label.textContent = ENTRY_CONFIG.fieldLabels[key];
@@ -528,6 +586,26 @@ function renderEntryFields() {
     const hint = document.createElement('div'); hint.className = 'current-val'; hint.id = 'hint_' + key;
     container.appendChild(label); container.appendChild(input); container.appendChild(hint);
   });
+}
+/**
+ * บริการหลัก / บริการเสริม (Gold/Platinum/FET ฯลฯ) — แสดงคงที่ ไม่เปลี่ยนตามแผนกที่เลือก เพราะทุกแผนกกรอกได้
+ */
+function renderFieldGroup(containerId, keys) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  (keys || []).forEach(function (key) {
+    const label = document.createElement('label');
+    label.textContent = ENTRY_CONFIG.fieldLabels[key];
+    label.setAttribute('for', 'f_' + key);
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.id = 'f_' + key; input.dataset.key = key;
+    const hint = document.createElement('div'); hint.className = 'current-val'; hint.id = 'hint_' + key;
+    container.appendChild(label); container.appendChild(input); container.appendChild(hint);
+  });
+}
+function renderExtraFields() {
+  renderFieldGroup('mainFieldsContainer', ENTRY_CONFIG.mainFieldKeys);
+  renderFieldGroup('supportFieldsContainer', ENTRY_CONFIG.supportFieldKeys);
 }
 function loadEntryCurrentValues() {
   const row = document.getElementById('week').value;
@@ -615,6 +693,30 @@ function renderExec(data) {
       '<div class="pct-label ' + st.cls + '">' + st.icon + ' ' + fmtPct(c.achievePercent) + ' — ' + st.label + '</div>';
     grid.appendChild(card);
   });
+
+  renderExtraGrid('execMainGrid', 'main');
+  renderExtraGrid('execExtraGrid', 'support');
+
+  function renderExtraGrid(gridId, group) {
+    const g = document.getElementById(gridId);
+    g.innerHTML = '';
+    EXTRA_FIELDS.filter(function (f) { return f.group === group; }).forEach(function (f) {
+      const c = data.categories[f.key];
+      if (!c) return;
+      const st = statusOf(c.achievePercent);
+      const card = document.createElement('div');
+      card.className = 'card kpi-card';
+      card.innerHTML =
+        '<div class="kpi-name">' + c.label + '</div>' +
+        '<div class="kpi-value"><b>' + fmt(c.actual) + '</b></div>' +
+        '<div class="kpi-target">เป้าหมาย ' + (c.target > 0 ? fmt(c.target) : 'ยังไม่กำหนด') + '</div>' +
+        (c.target > 0
+          ? '<div class="track"><div class="fill" style="width:' + Math.min(100, c.achievePercent || 0) + '%;background:' + statusFill(c.achievePercent) + ';"></div></div>' +
+            '<div class="pct-label ' + st.cls + '">' + st.icon + ' ' + fmtPct(c.achievePercent) + ' — ' + st.label + '</div>'
+          : '<div class="current-val">ยังไม่ได้ตั้งเป้าหมาย (ใส่ในชีตแถว Target ของคอลัมน์นี้ได้)</div>');
+      g.appendChild(card);
+    });
+  }
 }
 
 /* =========================================================
@@ -630,6 +732,14 @@ function initTrend() {
     const opt = document.createElement('option'); opt.value = c.key; opt.textContent = c.label;
     sel.appendChild(opt);
   });
+  const mainGrp = document.createElement('optgroup'); mainGrp.label = 'บริการหลัก';
+  const supportGrp = document.createElement('optgroup'); supportGrp.label = 'บริการเสริม';
+  EXTRA_FIELDS.forEach(function (f) {
+    const opt = document.createElement('option'); opt.value = f.key; opt.textContent = f.label;
+    (f.group === 'main' ? mainGrp : supportGrp).appendChild(opt);
+  });
+  sel.appendChild(mainGrp);
+  sel.appendChild(supportGrp);
   sel.addEventListener('change', function () { loadTrend(sel.value); });
   loadTrend('revenue');
 }
@@ -649,7 +759,7 @@ function renderTrend(data) {
   const barGap = chartW / months.length;
   const barW = Math.min(34, barGap * 0.42);
   const maxVal = Math.max.apply(null, months.map(function (m) { return Math.max(m.actual, m.target); })) || 1;
-  const color = CATEGORY_COLOR[data.category] || 'var(--series-1)';
+  const color = CATEGORY_COLOR[data.category] || extraColor(data.category);
 
   let bars = '', targets = '', axisLabels = '', gridLines = '';
   for (let i = 0; i <= 4; i++) {
