@@ -241,6 +241,12 @@
             <div class="current-val" id="caseHint"></div>
           </div>
 
+          <div class="case-box" id="revenueBox" style="display:none;">
+            <div class="case-label" id="revenueLabel">รายได้รวมของรายการนี้ในสัปดาห์นี้ (บาท)</div>
+            <input type="number" min="0" id="revenueCount" placeholder="กรอกรายได้รวม (บาท)">
+            <div class="current-val" id="revenueHint"></div>
+          </div>
+
           <button type="submit" class="primary" id="submitBtn">บันทึกข้อมูล</button>
           <div id="msg" class="msg"></div>
         </form>
@@ -443,6 +449,8 @@ const EXTRA_FIELDS = [
   { key: 'hysteroscopy', label: 'Hysteroscopy', group: 'support' },
   { key: 'goodsIssue', label: 'Goods Issue', group: 'support' }
 ];
+/* รายการที่ราคาต่อเคสไม่คงที่ — ต้องกรอก "รายได้รวมของสัปดาห์นั้น" เพิ่มเติมตอนคีย์ข้อมูล (key ต้องตรงกับ REVENUE_ENTRY_COLUMNS ใน Code.gs) */
+const REVENUE_ENTRY_KEYS = ['extraIui', 'consultInfertility', 'aep', 'anc', 'gyn', 'ngs', 'embryoFreeze', 'dating', 'anc12wkIcsi', 'hysteroscopy', 'goodsIssue'];
 const EXTRA_COLOR_CYCLE = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)'];
 function extraColor(key) {
   const i = EXTRA_FIELDS.findIndex(function (f) { return f.key === key; });
@@ -595,22 +603,37 @@ function onEntryConfig(config) {
 function onPackageOrWeekChange() {
   const key = document.getElementById('pkg').value;
   const caseBox = document.getElementById('caseBox');
+  const revenueBox = document.getElementById('revenueBox');
   const msg = document.getElementById('msg');
   msg.className = 'msg';
-  if (!key) { caseBox.className = 'case-box'; return; }
+  if (!key) { caseBox.className = 'case-box'; revenueBox.style.display = 'none'; return; }
   document.getElementById('caseLabel').textContent = ENTRY_CONFIG.fieldLabels[key] + ' — กี่เคส';
   document.getElementById('caseCount').value = '';
   document.getElementById('caseHint').textContent = '';
   caseBox.className = 'case-box active';
-  loadEntryCurrentValue(key);
+  const needsRevenue = REVENUE_ENTRY_KEYS.indexOf(key) !== -1;
+  if (needsRevenue) {
+    document.getElementById('revenueLabel').textContent = ENTRY_CONFIG.fieldLabels[key] + ' — รายได้รวมของสัปดาห์นี้ (บาท)';
+    document.getElementById('revenueCount').value = '';
+    document.getElementById('revenueHint').textContent = '';
+    revenueBox.style.display = 'block';
+  } else {
+    revenueBox.style.display = 'none';
+  }
+  loadEntryCurrentValue(key, needsRevenue);
 }
-function loadEntryCurrentValue(key) {
+function loadEntryCurrentValue(key, needsRevenue) {
   const row = document.getElementById('week').value;
   if (!row) return;
   apiGet('rowdata', { row: row }).then(function (data) {
     const hint = document.getElementById('caseHint');
     const val = data[key];
     hint.textContent = (val === null || val === '' || typeof val === 'undefined') ? 'ยังไม่มีข้อมูล' : ('ค่าปัจจุบัน: ' + val);
+    if (needsRevenue) {
+      const revHint = document.getElementById('revenueHint');
+      const revVal = data[key + 'Revenue'];
+      revHint.textContent = (revVal === null || revVal === '' || typeof revVal === 'undefined') ? 'ยังไม่มีข้อมูล' : ('ค่าปัจจุบัน: ' + fmt(revVal) + ' บาท');
+    }
   }).catch(onEntryError);
 }
 document.getElementById('entryForm').addEventListener('submit', function (e) {
@@ -618,14 +641,19 @@ document.getElementById('entryForm').addEventListener('submit', function (e) {
   const key = document.getElementById('pkg').value;
   const row = Number(document.getElementById('week').value);
   const count = document.getElementById('caseCount').value;
+  const needsRevenue = REVENUE_ENTRY_KEYS.indexOf(key) !== -1;
+  const revenue = document.getElementById('revenueCount').value;
   if (!key) { alert('กรุณาเลือก Package ก่อนค่ะ'); return; }
   if (count === '') { alert('กรุณากรอกจำนวนเคสค่ะ'); return; }
+  if (needsRevenue && revenue === '') { alert('กรุณากรอกรายได้รวมของรายการนี้ในสัปดาห์นี้ด้วยค่ะ'); return; }
   const btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
-  apiPost('submitEntry', { row: row, key: key, count: count })
+  const payload = { row: row, key: key, count: count };
+  if (needsRevenue) payload.revenue = revenue;
+  apiPost('submitEntry', payload)
     .then(function (res) {
       const msg = document.getElementById('msg');
-      if (res.success) { msg.className = 'msg success'; msg.textContent = 'บันทึกข้อมูลเรียบร้อยแล้ว'; loadEntryCurrentValue(key); }
+      if (res.success) { msg.className = 'msg success'; msg.textContent = 'บันทึกข้อมูลเรียบร้อยแล้ว'; loadEntryCurrentValue(key, needsRevenue); }
       else { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + res.message; }
       btn.disabled = false; btn.textContent = 'บันทึกข้อมูล';
     })
@@ -1001,6 +1029,7 @@ function renderWeekly(data) {
     '<th>สัปดาห์</th><th>New</th><th>CN</th><th>Oocyte</th><th>IUI</th><th>Revenue</th>' +
     mainFields.map(function (f) { return '<th>' + f.label + '</th>'; }).join('') +
     supportFields.map(function (f) { return '<th>' + f.label + '</th>'; }).join('') +
+    '<th>Revenue (แพ็กเกจใหม่)</th>' +
     '</tr></thead><tbody>';
   data.forEach(function (w) {
     html += '<tr>' +
@@ -1012,6 +1041,7 @@ function renderWeekly(data) {
       '<td>' + fmt(w.values.revenue) + '</td>' +
       mainFields.map(function (f) { return '<td>' + fmt(w.values[f.key]) + '</td>'; }).join('') +
       supportFields.map(function (f) { return '<td>' + fmt(w.values[f.key]) + '</td>'; }).join('') +
+      '<td><b>' + fmt(w.values.extraRevenueTotal) + '</b></td>' +
       '</tr>';
   });
   html += '</tbody></table>';
