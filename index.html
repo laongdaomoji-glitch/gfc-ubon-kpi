@@ -750,7 +750,7 @@ function renderExec(data) {
 
   const grid = document.getElementById('execGrid');
   grid.innerHTML = '';
-  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui'];
+  const order = ['newP', 'cn', 'oocyte', 'iui'];
   order.forEach(function (key) {
     const c = data.categories[key];
     if (!c) return;
@@ -798,7 +798,7 @@ function initTrend() {
   const sel = document.getElementById('trendCategory');
   const cats = [
     { key: 'revenue', label: 'Revenue' }, { key: 'newP', label: 'New' }, { key: 'cn', label: 'CN' },
-    { key: 'opu', label: 'OPU' }, { key: 'icsi', label: 'ICSI' }, { key: 'oocyte', label: 'Oocyte Freezing' }, { key: 'iui', label: 'IUI' }
+    { key: 'oocyte', label: 'Oocyte Freezing' }, { key: 'iui', label: 'IUI' }
   ];
   cats.forEach(function (c) {
     const opt = document.createElement('option'); opt.value = c.key; opt.textContent = c.label;
@@ -911,7 +911,7 @@ function renderForecast(data) {
 
   const grid = document.getElementById('forecastGrid');
   grid.innerHTML = '';
-  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui', 'revenue'];
+  const order = ['newP', 'cn', 'oocyte', 'iui', 'revenue'];
   order.forEach(function (key) {
     const c = data.categories[key];
     if (!c) return;
@@ -960,7 +960,7 @@ function renderProductivity(data) {
     '<div class="card"><div class="kpi-name">รายได้ต่อเคส</div><div class="kpi-value"><b>' + fmt(data.revenuePerCase) + '</b> บาท</div></div>' +
     '<div class="card"><div class="kpi-name">ช่วงเวลา</div><div class="kpi-value"><b>' + data.monthLabel + '</b></div></div>';
 
-  const order = ['opuDelight', 'opuIcsi', 'icsiDelight', 'icsiIcsi', 'oocyte1', 'oocyte2', 'iui'];
+  const order = ['oocyte1', 'oocyte2', 'iui'];
   const colorList = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)', 'var(--series-5)', 'var(--series-6)', 'var(--series-7)'];
   let rows = '<table><thead><tr><th>บริการ</th><th>จำนวน</th><th>ราคา/หน่วย</th><th>รายได้</th><th>สัดส่วน</th></tr></thead><tbody>';
   order.forEach(function (key, i) {
@@ -995,17 +995,23 @@ function initWeekly() {
 function renderWeekly(data) {
   document.getElementById('weeklyLoading').style.display = 'none';
   document.getElementById('weeklyContent').style.display = 'block';
-  let html = '<table><thead><tr><th>สัปดาห์</th><th>New</th><th>CN</th><th>OPU</th><th>ICSI</th><th>Oocyte</th><th>IUI</th><th>Revenue</th></tr></thead><tbody>';
+  const mainFields = EXTRA_FIELDS.filter(function (f) { return f.group === 'main'; });
+  const supportFields = EXTRA_FIELDS.filter(function (f) { return f.group === 'support'; });
+  let html = '<table><thead><tr>' +
+    '<th>สัปดาห์</th><th>New</th><th>CN</th><th>Oocyte</th><th>IUI</th><th>Revenue</th>' +
+    mainFields.map(function (f) { return '<th>' + f.label + '</th>'; }).join('') +
+    supportFields.map(function (f) { return '<th>' + f.label + '</th>'; }).join('') +
+    '</tr></thead><tbody>';
   data.forEach(function (w) {
     html += '<tr>' +
       '<td>' + w.weekIndex + '. ' + w.label + '</td>' +
       '<td>' + fmt(w.values.newP) + '</td>' +
       '<td>' + fmt(w.values.cn) + '</td>' +
-      '<td>' + fmt(w.values.opu) + '</td>' +
-      '<td>' + fmt(w.values.icsi) + '</td>' +
       '<td>' + fmt(w.values.oocyte) + '</td>' +
       '<td>' + fmt(w.values.iui) + '</td>' +
       '<td>' + fmt(w.values.revenue) + '</td>' +
+      mainFields.map(function (f) { return '<td>' + fmt(w.values[f.key]) + '</td>'; }).join('') +
+      supportFields.map(function (f) { return '<td>' + fmt(w.values[f.key]) + '</td>'; }).join('') +
       '</tr>';
   });
   html += '</tbody></table>';
@@ -1043,8 +1049,8 @@ function renderWow(index) {
   const prev = WEEKLY_DATA[index - 1];
   const grid = document.getElementById('wowContent');
   grid.innerHTML = '';
-  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui', 'revenue'];
-  const labelMap = { newP: 'New', cn: 'CN', opu: 'OPU', icsi: 'ICSI', oocyte: 'Oocyte Freezing', iui: 'IUI', revenue: 'Revenue' };
+  const order = ['newP', 'cn', 'oocyte', 'iui', 'revenue'];
+  const labelMap = { newP: 'New', cn: 'CN', oocyte: 'Oocyte Freezing', iui: 'IUI', revenue: 'Revenue' };
   order.forEach(function (key) {
     const curVal = current.values[key];
     const prevVal = prev.values[key];
@@ -1080,7 +1086,7 @@ function renderInsights(report, forecast) {
   document.getElementById('insightsLoading').style.display = 'none';
   document.getElementById('insightsContent').style.display = 'block';
 
-  const order = ['newP', 'cn', 'opu', 'icsi', 'oocyte', 'iui'];
+  const order = ['newP', 'cn', 'oocyte', 'iui'];
   const withPct = order.map(function (k) { return { key: k, label: report.categories[k].label, pct: report.categories[k].achievePercent }; })
     .filter(function (c) { return c.pct !== null; });
   withPct.sort(function (a, b) { return b.pct - a.pct; });
