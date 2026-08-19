@@ -155,6 +155,11 @@
   }
   .case-box.active { display: block; }
   .case-box .case-label { font-weight: 700; font-size: 15px; margin-bottom: 8px; color: var(--text-primary); }
+  #section-targets .form-card { max-width: 480px; }
+  .target-month-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin-top: 16px; }
+  .target-month-row label { margin: 0 0 4px; font-size: 12px; }
+  .target-month-row input { padding: 8px 10px; font-size: 14px; }
+  .target-month-row .current-val { margin-top: 2px; }
   .entry-columns { display: flex; gap: 32px; flex-wrap: wrap; margin-top: 8px; }
   .entry-col { flex: 1; min-width: 260px; }
   .entry-col-title {
@@ -196,6 +201,7 @@
 
     <div class="nav-label">คีย์ข้อมูล</div>
     <div class="nav-item" data-section="entry"><span class="nav-icon">✏️</span> คีย์ข้อมูลรายสัปดาห์</div>
+    <div class="nav-item" data-section="targets"><span class="nav-icon">⊙</span> Set an Objective</div>
 
     <div class="nav-label">Performance Report</div>
     <div class="nav-item" data-section="exec"><span class="nav-icon">▦</span> Executive Summary</div>
@@ -237,6 +243,27 @@
 
           <button type="submit" class="primary" id="submitBtn">บันทึกข้อมูล</button>
           <div id="msg" class="msg"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== SET TARGETS ===== -->
+    <div class="section" id="section-targets">
+      <div class="page-header">
+        <div class="eyebrow">Data Entry</div>
+        <h1 class="page-title">Set an Objective</h1>
+        <p class="page-desc">เลือก Package แล้วกรอกเป้าหมายรายเดือน (เดือนไหนไม่กรอกจะไม่เปลี่ยนค่าเดิม)</p>
+      </div>
+      <div class="card form-card">
+        <div id="targetsLoading" class="loading">กำลังโหลดข้อมูล...</div>
+        <form id="targetsForm" style="display:none;">
+          <label for="targetPkg">PACKAGE</label>
+          <select class="wide" id="targetPkg">
+            <option value="">— เลือก Package —</option>
+          </select>
+          <div id="targetMonthsContainer"></div>
+          <button type="submit" class="primary" id="targetSubmitBtn">บันทึกเป้าหมาย</button>
+          <div id="targetMsg" class="msg"></div>
         </form>
       </div>
     </div>
@@ -476,7 +503,7 @@ function apiPost(action, payload) {
   url.searchParams.set('action', action);
   Object.keys(payload || {}).forEach(function (k) {
     const v = payload[k];
-    url.searchParams.set(k, (k === 'values' ? JSON.stringify(v) : v));
+    url.searchParams.set(k, (v !== null && typeof v === 'object') ? JSON.stringify(v) : v);
   });
   return jsonpRequest(url.toString());
 }
@@ -523,6 +550,7 @@ navItems.forEach(function (item) {
 
 function initSection(key) {
   if (key === 'entry') loadEntry();
+  else if (key === 'targets') loadTargetsPage();
   else if (key === 'exec') initExec();
   else if (key === 'trend') initTrend();
   else if (key === 'funnel') initFunnel();
@@ -607,6 +635,86 @@ function onEntryError(err) {
   const msg = document.getElementById('msg');
   if (msg) { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err); }
   const loadingEl = document.getElementById('loading');
+  if (loadingEl) loadingEl.textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (err.message || err);
+}
+
+/* =========================================================
+ * SET TARGETS
+ * ========================================================= */
+let TARGETS_CONFIG = null;
+let targetsInitDone = false;
+function loadTargetsPage() {
+  if (targetsInitDone) return;
+  targetsInitDone = true;
+  apiGet('config').then(function (config) {
+    TARGETS_CONFIG = config;
+    const pkgSelect = document.getElementById('targetPkg');
+    (config.packageGroups || []).forEach(function (grp) {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = grp.title;
+      grp.keys.forEach(function (key) {
+        const opt = document.createElement('option');
+        opt.value = key; opt.textContent = config.fieldLabels[key];
+        optgroup.appendChild(opt);
+      });
+      pkgSelect.appendChild(optgroup);
+    });
+    document.getElementById('targetsLoading').style.display = 'none';
+    document.getElementById('targetsForm').style.display = 'block';
+    pkgSelect.addEventListener('change', onTargetPackageChange);
+  }).catch(onTargetsError);
+}
+function onTargetPackageChange() {
+  const key = document.getElementById('targetPkg').value;
+  const container = document.getElementById('targetMonthsContainer');
+  const msg = document.getElementById('targetMsg');
+  msg.className = 'msg';
+  container.innerHTML = '';
+  if (!key) return;
+  container.innerHTML = '<div class="current-val">กำลังโหลดเป้าหมายปัจจุบัน...</div>';
+  apiGet('targets', { key: key }).then(function (data) {
+    container.innerHTML = '';
+    const grid = document.createElement('div');
+    grid.className = 'target-month-grid';
+    data.months.forEach(function (m) {
+      const row = document.createElement('div');
+      row.className = 'target-month-row';
+      row.innerHTML =
+        '<label for="tm_' + m.key + '">' + m.name + '</label>' +
+        '<input type="number" min="0" id="tm_' + m.key + '" placeholder="เป้าหมาย">' +
+        '<div class="current-val">ปัจจุบัน: ' + fmt(m.target) + '</div>';
+      grid.appendChild(row);
+    });
+    container.appendChild(grid);
+    data.months.forEach(function (m) {
+      document.getElementById('tm_' + m.key).value = m.target || '';
+    });
+  }).catch(onTargetsError);
+}
+document.getElementById('targetsForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  const key = document.getElementById('targetPkg').value;
+  if (!key) { alert('กรุณาเลือก Package ก่อนค่ะ'); return; }
+  const targets = {};
+  for (let i = 1; i <= 12; i++) {
+    const el = document.getElementById('tm_' + i);
+    if (el && el.value !== '') targets[i] = el.value;
+  }
+  const btn = document.getElementById('targetSubmitBtn');
+  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  apiPost('setTargets', { key: key, targets: targets })
+    .then(function (res) {
+      const msg = document.getElementById('targetMsg');
+      if (res.success) { msg.className = 'msg success'; msg.textContent = 'บันทึกเป้าหมายเรียบร้อยแล้ว'; }
+      else { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + res.message; }
+      btn.disabled = false; btn.textContent = 'บันทึกเป้าหมาย';
+    })
+    .catch(function (err) { onTargetsError(err); btn.disabled = false; btn.textContent = 'บันทึกเป้าหมาย'; });
+});
+function onTargetsError(err) {
+  const msg = document.getElementById('targetMsg');
+  if (msg) { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + (err.message || err); }
+  const loadingEl = document.getElementById('targetsLoading');
   if (loadingEl) loadingEl.textContent = 'โหลดข้อมูลไม่สำเร็จ: ' + (err.message || err);
 }
 
