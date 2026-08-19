@@ -148,7 +148,13 @@
   .msg.error { background: #fbe3e2; color: #8a1f1e; display: block; }
 
   /* ---------- Entry form ---------- */
-  .form-card { max-width: 900px; }
+  .form-card { max-width: 460px; }
+  .case-box {
+    display: none; margin-top: 18px; padding: 16px; border-radius: 10px;
+    background: var(--page-plane); border: 1px solid var(--gridline);
+  }
+  .case-box.active { display: block; }
+  .case-box .case-label { font-weight: 700; font-size: 15px; margin-bottom: 8px; color: var(--text-primary); }
   .entry-columns { display: flex; gap: 32px; flex-wrap: wrap; margin-top: 8px; }
   .entry-col { flex: 1; min-width: 260px; }
   .entry-col-title {
@@ -210,33 +216,23 @@
       <div class="page-header">
         <div class="eyebrow">Data Entry</div>
         <h1 class="page-title">คีย์ข้อมูลรายสัปดาห์</h1>
-        <p class="page-desc">เลือกแผนกและสัปดาห์ แล้วกรอกจำนวน ระบบจะบันทึกเฉพาะข้อมูลของแผนกท่านเท่านั้น</p>
+        <p class="page-desc">เลือก Package แล้วกรอกจำนวนเคส ระบบจะบันทึกเฉพาะ Package ที่เลือก (เลือก Package อะไรก็ได้ ไม่จำกัดตามแผนก)</p>
       </div>
       <div class="card form-card">
         <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
         <form id="entryForm" style="display:none;">
-          <label for="department">แผนก</label>
-          <select class="wide" id="department"></select>
-
-          <div id="pinContainer" style="display:none;">
-            <label for="pin">รหัสผ่านแผนกบัญชี</label>
-            <input type="password" id="pin" placeholder="กรอกรหัสผ่าน">
-          </div>
+          <label for="pkg">PACKAGE</label>
+          <select class="wide" id="pkg">
+            <option value="">— เลือก Package —</option>
+          </select>
 
           <label for="week">สัปดาห์</label>
           <select class="wide" id="week"></select>
 
-          <div class="entry-columns">
-            <div class="entry-col">
-              <div class="entry-col-title">ข้อมูลของแผนกที่เลือก</div>
-              <div id="fieldsContainer"></div>
-            </div>
-            <div class="entry-col">
-              <div class="entry-col-title">บริการหลัก (ทุกแผนกกรอกได้)</div>
-              <div id="mainFieldsContainer"></div>
-              <div class="entry-col-title" style="margin-top:20px;">บริการเสริม (ทุกแผนกกรอกได้)</div>
-              <div id="supportFieldsContainer"></div>
-            </div>
+          <div class="case-box" id="caseBox">
+            <div class="case-label" id="caseLabel"></div>
+            <input type="number" min="0" id="caseCount" placeholder="กรอกจำนวนเคส">
+            <div class="current-val" id="caseHint"></div>
           </div>
 
           <button type="submit" class="primary" id="submitBtn">บันทึกข้อมูล</button>
@@ -546,10 +542,16 @@ function loadEntry() {
 }
 function onEntryConfig(config) {
   ENTRY_CONFIG = config;
-  const deptSelect = document.getElementById('department');
-  config.departments.forEach(function (d) {
-    const opt = document.createElement('option'); opt.value = d; opt.textContent = d;
-    deptSelect.appendChild(opt);
+  const pkgSelect = document.getElementById('pkg');
+  (config.packageGroups || []).forEach(function (grp) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = grp.title;
+    grp.keys.forEach(function (key) {
+      const opt = document.createElement('option');
+      opt.value = key; opt.textContent = config.fieldLabels[key];
+      optgroup.appendChild(opt);
+    });
+    pkgSelect.appendChild(optgroup);
   });
   const weekSelect = document.getElementById('week');
   config.weeks.forEach(function (w) {
@@ -559,81 +561,43 @@ function onEntryConfig(config) {
   });
   document.getElementById('loading').style.display = 'none';
   document.getElementById('entryForm').style.display = 'block';
-  renderEntryFields();
-  renderExtraFields();
-  loadEntryCurrentValues();
-  deptSelect.addEventListener('change', renderEntryFields);
-  weekSelect.addEventListener('change', function () { renderEntryFields(); loadEntryCurrentValues(); });
+  pkgSelect.addEventListener('change', onPackageOrWeekChange);
+  weekSelect.addEventListener('change', onPackageOrWeekChange);
 }
-function renderEntryFields() {
-  const dept = document.getElementById('department').value;
-  const extraSet = {};
-  (ENTRY_CONFIG.extraFieldKeys || []).forEach(function (k) { extraSet[k] = true; });
-  const fields = (ENTRY_CONFIG.departmentFields[dept] || []).filter(function (key) { return !extraSet[key]; });
-  const container = document.getElementById('fieldsContainer');
-  container.innerHTML = '';
-  document.getElementById('pinContainer').style.display = (dept === ENTRY_CONFIG.adminDepartment) ? 'block' : 'none';
-  if (!fields.length) {
-    container.innerHTML = '<div class="current-val">แผนกนี้ไม่มีช่องข้อมูลเฉพาะ กรอกที่ "บริการหลัก/บริการเสริม" ทางขวาได้เลย</div>';
-    return;
-  }
-  fields.forEach(function (key) {
-    const label = document.createElement('label');
-    label.textContent = ENTRY_CONFIG.fieldLabels[key];
-    label.setAttribute('for', 'f_' + key);
-    const input = document.createElement('input');
-    input.type = 'number'; input.min = '0'; input.id = 'f_' + key; input.dataset.key = key;
-    const hint = document.createElement('div'); hint.className = 'current-val'; hint.id = 'hint_' + key;
-    container.appendChild(label); container.appendChild(input); container.appendChild(hint);
-  });
+function onPackageOrWeekChange() {
+  const key = document.getElementById('pkg').value;
+  const caseBox = document.getElementById('caseBox');
+  const msg = document.getElementById('msg');
+  msg.className = 'msg';
+  if (!key) { caseBox.className = 'case-box'; return; }
+  document.getElementById('caseLabel').textContent = ENTRY_CONFIG.fieldLabels[key] + ' — กี่เคส';
+  document.getElementById('caseCount').value = '';
+  document.getElementById('caseHint').textContent = '';
+  caseBox.className = 'case-box active';
+  loadEntryCurrentValue(key);
 }
-/**
- * บริการหลัก / บริการเสริม (Gold/Platinum/FET ฯลฯ) — แสดงคงที่ ไม่เปลี่ยนตามแผนกที่เลือก เพราะทุกแผนกกรอกได้
- */
-function renderFieldGroup(containerId, keys) {
-  const container = document.getElementById(containerId);
-  container.innerHTML = '';
-  (keys || []).forEach(function (key) {
-    const label = document.createElement('label');
-    label.textContent = ENTRY_CONFIG.fieldLabels[key];
-    label.setAttribute('for', 'f_' + key);
-    const input = document.createElement('input');
-    input.type = 'number'; input.min = '0'; input.id = 'f_' + key; input.dataset.key = key;
-    const hint = document.createElement('div'); hint.className = 'current-val'; hint.id = 'hint_' + key;
-    container.appendChild(label); container.appendChild(input); container.appendChild(hint);
-  });
-}
-function renderExtraFields() {
-  renderFieldGroup('mainFieldsContainer', ENTRY_CONFIG.mainFieldKeys);
-  renderFieldGroup('supportFieldsContainer', ENTRY_CONFIG.supportFieldKeys);
-}
-function loadEntryCurrentValues() {
+function loadEntryCurrentValue(key) {
   const row = document.getElementById('week').value;
   if (!row) return;
   apiGet('rowdata', { row: row }).then(function (data) {
-    Object.keys(data).forEach(function (key) {
-      const hint = document.getElementById('hint_' + key);
-      if (hint) hint.textContent = (data[key] === null || data[key] === '') ? 'ยังไม่มีข้อมูล' : ('ค่าปัจจุบัน: ' + data[key]);
-    });
+    const hint = document.getElementById('caseHint');
+    const val = data[key];
+    hint.textContent = (val === null || val === '' || typeof val === 'undefined') ? 'ยังไม่มีข้อมูล' : ('ค่าปัจจุบัน: ' + val);
   }).catch(onEntryError);
 }
 document.getElementById('entryForm').addEventListener('submit', function (e) {
   e.preventDefault();
-  const dept = document.getElementById('department').value;
+  const key = document.getElementById('pkg').value;
   const row = Number(document.getElementById('week').value);
-  const fields = ENTRY_CONFIG.departmentFields[dept] || [];
-  const values = {};
-  fields.forEach(function (key) {
-    const el = document.getElementById('f_' + key);
-    if (el && el.value !== '') values[key] = el.value;
-  });
-  const pin = document.getElementById('pin').value;
+  const count = document.getElementById('caseCount').value;
+  if (!key) { alert('กรุณาเลือก Package ก่อนค่ะ'); return; }
+  if (count === '') { alert('กรุณากรอกจำนวนเคสค่ะ'); return; }
   const btn = document.getElementById('submitBtn');
   btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
-  apiPost('submitEntry', { row: row, department: dept, values: values, pin: pin })
+  apiPost('submitEntry', { row: row, key: key, count: count })
     .then(function (res) {
       const msg = document.getElementById('msg');
-      if (res.success) { msg.className = 'msg success'; msg.textContent = 'บันทึกข้อมูลเรียบร้อยแล้ว'; loadEntryCurrentValues(); }
+      if (res.success) { msg.className = 'msg success'; msg.textContent = 'บันทึกข้อมูลเรียบร้อยแล้ว'; loadEntryCurrentValue(key); }
       else { msg.className = 'msg error'; msg.textContent = 'เกิดข้อผิดพลาด: ' + res.message; }
       btn.disabled = false; btn.textContent = 'บันทึกข้อมูล';
     })
